@@ -66,3 +66,54 @@ static void say(int fd, const char *s)
     ssize_t r = write(fd, s, len);
     (void)r;
 }
+
+/* ---------- Task 2: growing the heap ---------- */
+
+/* Gets at least `need` bytes of payload (and never less than CHUNK in total)
+ * from the OS and links it in as a free block at the end of the list. */
+static block_t *grow(size_t need)
+{
+    if (need > SIZE_MAX / 2)
+        return NULL;
+
+    size_t total = align_up(HDR + need);
+    if (total < CHUNK)
+        total = CHUNK;
+
+    /* the break may not be 16-byte aligned, so pad up to the next boundary */
+    void *cur = sbrk(0);
+    if (cur == (void *)-1)
+        return NULL;
+    size_t pad = align_up((size_t)cur) - (size_t)cur;
+
+    void *p = sbrk((intptr_t)(pad + total));
+    if (p == (void *)-1)
+        return NULL;
+
+    /* libc's malloc could have moved the break between the two calls, so
+     * align what sbrk actually returned rather than trusting our padding */
+    char *start = (char *)align_up((size_t)p);
+    char *end = (char *)p + pad + total;
+    size_t usable = (size_t)(end - start) & ~(size_t)(ALIGNMENT - 1);
+    heap_total += pad + total;
+
+    /* if the old last block is free and touches the new memory, extend it
+     * rather than creating a second neighbour that would never be merged */
+    if (tail && tail->free && block_end(tail) == start) {
+        tail->size += usable;
+        return tail;
+    }
+
+    block_t *b = (block_t *)start;
+    b->size = usable - HDR;
+    b->next = NULL;
+    b->free = 1;
+    b->magic = MAGIC;
+
+    if (tail)
+        tail->next = b;
+    else
+        head = b;
+    tail = b;
+    return b;
+}
