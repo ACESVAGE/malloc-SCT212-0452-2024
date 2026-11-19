@@ -129,6 +129,26 @@ static block_t *find_first(size_t need)
     return NULL;
 }
 
+/* Best-fit: the smallest free block that is big enough. */
+static block_t *find_best(size_t need)
+{
+    block_t *best = NULL;
+    for (block_t *b = head; b; b = b->next) {
+        if (b->free && b->size >= need) {
+            if (best == NULL || b->size < best->size)
+                best = b;
+            if (b->size == need)
+                break;              /* cannot do better than exact */
+        }
+    }
+    return best;
+}
+
+static block_t *find_fit(size_t need)
+{
+    return policy == FIT_BEST ? find_best(need) : find_first(need);
+}
+
 /* ---------- Task 4: splitting ---------- */
 
 /* Cut b so its payload is exactly `need` bytes, if the rest is big enough
@@ -159,12 +179,12 @@ void *my_malloc(size_t size)
 
     size_t need = align_up(size);
 
-    block_t *b = find_first(need);
+    block_t *b = find_fit(need);
     if (b == NULL) {
         /* nothing fits: get more memory, then the new block must fit */
         if (grow(need) == NULL)
             return NULL;
-        b = find_first(need);
+        b = find_fit(need);
         if (b == NULL)
             return NULL;
     }
@@ -288,4 +308,11 @@ void *my_realloc(void *ptr, size_t size)
     memcpy(np, ptr, b->size < need ? b->size : need);
     my_free(ptr);
     return np;
+}
+
+/* ---------- Task 7: policy ---------- */
+
+void set_policy(fit_policy_t p)
+{
+    policy = p;
 }
