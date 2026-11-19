@@ -238,3 +238,54 @@ void *my_calloc(size_t n, size_t size)
         memset(p, 0, total);
     return p;
 }
+
+/* ---------- Task 6: my_realloc ---------- */
+
+void *my_realloc(void *ptr, size_t size)
+{
+    if (ptr == NULL)
+        return my_malloc(size);
+    if (size == 0) {
+        my_free(ptr);
+        return NULL;
+    }
+
+    block_t *b = header(ptr);
+    if (b->magic != MAGIC || b->free) {
+        say(2, "my_realloc: invalid pointer\n");
+        return NULL;
+    }
+
+    if (size > SIZE_MAX - 2 * HDR)
+        return NULL;
+    size_t need = align_up(size);
+
+    /* already big enough: keep it, give back the tail if it is worth it */
+    if (b->size >= need) {
+        split_block(b, need);
+        coalesce();
+        return ptr;
+    }
+
+    /* next block is free, touches us, and is big enough together with us */
+    block_t *n = b->next;
+    if (n && n->free && block_end(b) == (char *)n &&
+        b->size + HDR + n->size >= need) {
+        b->size += HDR + n->size;
+        b->next = n->next;
+        if (tail == n)
+            tail = b;
+        n->magic = 0;
+        split_block(b, need);
+        coalesce();
+        return ptr;
+    }
+
+    /* last resort: new block, copy, free the old one */
+    void *np = my_malloc(size);
+    if (np == NULL)
+        return NULL;                 /* old block is left untouched */
+    memcpy(np, ptr, b->size < need ? b->size : need);
+    my_free(ptr);
+    return np;
+}
