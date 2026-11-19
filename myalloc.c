@@ -316,3 +316,60 @@ void set_policy(fit_policy_t p)
 {
     policy = p;
 }
+
+/* ---------- Task 7: statistics, dump and consistency check ---------- */
+
+void heap_stats(heap_stats_t *out)
+{
+    memset(out, 0, sizeof *out);
+    out->heap_bytes = heap_total;
+
+    for (block_t *b = head; b; b = b->next) {
+        out->blocks++;
+        if (b->free) {
+            out->free_blocks++;
+            out->free_bytes += b->size;
+            if (b->size > out->largest_free)
+                out->largest_free = b->size;
+        } else {
+            out->used_bytes += b->size;
+        }
+    }
+}
+
+void heap_dump(void)
+{
+    char line[128];
+    int i = 0;
+
+    for (block_t *b = head; b; b = b->next, i++) {
+        snprintf(line, sizeof line, "[%2d] %p size=%zu %s\n",
+                 i, (void *)b, b->size, b->free ? "FREE" : "USED");
+        say(1, line);
+    }
+}
+
+int heap_check(void)
+{
+    block_t *prev = NULL;
+
+    for (block_t *b = head; b; prev = b, b = b->next) {
+        if (b->magic != MAGIC)
+            return 0;                                   /* bad header      */
+        if (((size_t)payload(b) % ALIGNMENT) != 0)
+            return 0;                                   /* misaligned      */
+        if (b->size % ALIGNMENT != 0)
+            return 0;
+        if (prev) {
+            if ((char *)b <= (char *)prev)
+                return 0;                               /* not increasing  */
+            if (block_end(prev) > (char *)b)
+                return 0;                               /* overlap         */
+            if (prev->free && b->free && block_end(prev) == (char *)b)
+                return 0;                               /* unmerged pair   */
+        }
+        if (b->next == NULL && b != tail)
+            return 0;                                   /* tail is wrong   */
+    }
+    return 1;
+}
