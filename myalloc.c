@@ -173,3 +173,33 @@ void *my_malloc(size_t size)
     b->free = 0;
     return payload(b);
 }
+
+/* ---------- Task 5: my_free ---------- */
+
+void my_free(void *ptr)
+{
+    if (ptr == NULL)
+        return;
+
+    /* reject anything that cannot possibly be one of our payloads before
+     * we read the header in front of it */
+    char *lo = (char *)head;
+    char *hi = tail ? block_end(tail) : NULL;
+    if (head == NULL || (char *)ptr < lo + HDR || (char *)ptr >= hi ||
+        ((size_t)ptr % ALIGNMENT) != 0) {
+        say(2, "my_free: invalid pointer\n");
+        return;
+    }
+
+    block_t *b = header(ptr);
+    if (b->magic != MAGIC) {
+        say(2, "my_free: invalid pointer\n");
+        return;
+    }
+    if (b->free) {
+        say(2, "my_free: double free detected\n");
+        return;
+    }
+
+    b->free = 1;
+}
