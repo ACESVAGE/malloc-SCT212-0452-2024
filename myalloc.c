@@ -224,3 +224,17 @@ void my_free(void *ptr)
     b->free = 1;
     coalesce();
 }
+
+/* ---------- Task 6: my_calloc ---------- */
+
+void *my_calloc(size_t n, size_t size)
+{
+    if (n != 0 && size > SIZE_MAX / n)
+        return NULL;                 /* n * size would overflow */
+
+    size_t total = n * size;
+    void *p = my_malloc(total);
+    if (p)
+        memset(p, 0, total);
+    return p;
+}
