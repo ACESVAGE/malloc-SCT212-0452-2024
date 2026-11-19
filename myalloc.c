@@ -129,6 +129,27 @@ static block_t *find_first(size_t need)
     return NULL;
 }
 
+/* ---------- Task 4: splitting ---------- */
+
+/* Cut b so its payload is exactly `need` bytes, if the rest is big enough
+ * to become a block of its own (a header plus at least MIN_PAYLOAD bytes). */
+static void split_block(block_t *b, size_t need)
+{
+    if (b->size < need + HDR + MIN_PAYLOAD)
+        return;                          /* leftover too small: keep it whole */
+
+    block_t *rest = (block_t *)((char *)b + HDR + need);   /* char * math */
+    rest->size = b->size - need - HDR;
+    rest->free = 1;
+    rest->magic = MAGIC;
+    rest->next = b->next;
+
+    b->size = need;
+    b->next = rest;
+    if (tail == b)
+        tail = rest;
+}
+
 /* ---------- Task 3: my_malloc ---------- */
 
 void *my_malloc(size_t size)
@@ -148,6 +169,7 @@ void *my_malloc(size_t size)
             return NULL;
     }
 
+    split_block(b, need);
     b->free = 0;
     return payload(b);
 }
