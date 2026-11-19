@@ -117,3 +117,37 @@ static block_t *grow(size_t need)
     tail = b;
     return b;
 }
+
+/* ---------- Task 3: finding a block ---------- */
+
+/* First-fit: the first free block that is big enough. */
+static block_t *find_first(size_t need)
+{
+    for (block_t *b = head; b; b = b->next)
+        if (b->free && b->size >= need)
+            return b;
+    return NULL;
+}
+
+/* ---------- Task 3: my_malloc ---------- */
+
+void *my_malloc(size_t size)
+{
+    if (size == 0 || size > SIZE_MAX - 2 * HDR)
+        return NULL;
+
+    size_t need = align_up(size);
+
+    block_t *b = find_first(need);
+    if (b == NULL) {
+        /* nothing fits: get more memory, then the new block must fit */
+        if (grow(need) == NULL)
+            return NULL;
+        b = find_first(need);
+        if (b == NULL)
+            return NULL;
+    }
+
+    b->free = 0;
+    return payload(b);
+}
