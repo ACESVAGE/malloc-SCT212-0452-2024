@@ -174,6 +174,26 @@ void *my_malloc(size_t size)
     return payload(b);
 }
 
+/* ---------- Task 5: coalescing ---------- */
+
+/* Merge every run of free blocks that are also touching in memory. */
+static void coalesce(void)
+{
+    block_t *b = head;
+    while (b) {
+        block_t *n = b->next;
+        if (b->free && n && n->free && block_end(b) == (char *)n) {
+            b->size += HDR + n->size;
+            b->next = n->next;
+            if (tail == n)
+                tail = b;
+            n->magic = 0;           /* that header no longer exists */
+            continue;               /* b may now touch another free block */
+        }
+        b = b->next;
+    }
+}
+
 /* ---------- Task 5: my_free ---------- */
 
 void my_free(void *ptr)
@@ -202,4 +222,5 @@ void my_free(void *ptr)
     }
 
     b->free = 1;
+    coalesce();
 }
